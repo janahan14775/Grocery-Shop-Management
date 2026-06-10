@@ -1,26 +1,42 @@
+// Auth Middleware - Verifies JWT token and attaches user to request
 const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
-module.exports = (req, res, next) => {
+module.exports = async (req, res, next) => {
   try {
-    const token = req.headers.authorization;
+    // Get token from Authorization header (Bearer <token>)
+    const authHeader = req.headers.authorization;
 
-    if (!token) {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
-        message: 'No token'
+        message: 'No token provided. Please login.'
       });
     }
 
+    // Extract token after "Bearer "
+    const token = authHeader.split(' ')[1];
+
+    // Verify token and decode payload
     const decoded = jwt.verify(
       token,
       process.env.JWT_SECRET
     );
 
-    req.user = decoded;
+    // Attach full user object (without password) to request
+    const user = await User.findById(decoded.id).select('-password');
+
+    if (!user) {
+      return res.status(401).json({
+        message: 'User not found. Token invalid.'
+      });
+    }
+
+    req.user = user;
 
     next();
   } catch (error) {
     res.status(401).json({
-      message: 'Unauthorized'
+      message: 'Token is invalid or expired. Please login again.'
     });
   }
 };

@@ -1,22 +1,32 @@
+// Product Routes - CRUD with admin protection, search, filter
 const express = require('express');
 const multer = require('multer');
-
+const authMiddleware = require('../middleware/authMiddleware');
+const adminMiddleware = require('../middleware/adminMiddleware');
 const {
   createProduct,
   getProducts,
-  deleteProduct
+  getProductById,
+  updateProduct,
+  deleteProduct,
+  getLowStockProducts,
+  getCategories
 } = require('../controllers/productController');
 
 const router = express.Router();
 
-const upload = multer({
-  dest: 'uploads/'
-});
+// Multer setup for temp file uploads (Cloudinary handles final storage)
+const upload = multer({ dest: 'uploads/' });
 
-router.post('/', upload.single('image'), createProduct);
+// Public routes
+router.get('/', getProducts);                         // GET /api/products
+router.get('/categories', getCategories);              // GET /api/products/categories
+router.get('/low-stock', authMiddleware, adminMiddleware, getLowStockProducts); // GET /api/products/low-stock
+router.get('/:id', getProductById);                    // GET /api/products/:id
 
-router.get('/', getProducts);
-
-router.delete('/:id', deleteProduct);
+// Admin-only routes (auth + admin middleware)
+router.post('/', authMiddleware, adminMiddleware, upload.single('image'), createProduct);    // POST /api/products
+router.put('/:id', authMiddleware, adminMiddleware, upload.single('image'), updateProduct);  // PUT /api/products/:id
+router.delete('/:id', authMiddleware, adminMiddleware, deleteProduct);                       // DELETE /api/products/:id
 
 module.exports = router;

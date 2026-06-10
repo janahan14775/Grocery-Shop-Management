@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="#e8f5e9" />
+  
+  <!-- Store Building -->
+  <!-- Main building base -->
+  <rect x="100" y="240" width="312" height="190" rx="16" fill="#ffffff" stroke="#2e7d32" stroke-width="16" stroke-linejoin="round" />
+  
+  <!-- Awning (Striped Roof) -->
+  <path d="M70 160 L442 160 L412 240 L100 240 Z" fill="#4caf50" stroke="#2e7d32" stroke-width="16" stroke-linejoin="round" />
+  <!-- Awning stripes -->
+  <path d="M152 160 L140 240" stroke="#2e7d32" stroke-width="12" />
+  <path d="M214 160 L205 240" stroke="#2e7d32" stroke-width="12" />
+  <path d="M276 160 L271 240" stroke="#2e7d32" stroke-width="12" />
+  <path d="M338 160 L337 240" stroke="#2e7d32" stroke-width="12" />
+  <path d="M398 160 L402 240" stroke="#2e7d32" stroke-width="12" />
+  
+  <!-- Windows -->
+  <rect x="132" y="276" width="64" height="64" rx="8" fill="#e3f2fd" stroke="#2e7d32" stroke-width="12" />
+  <rect x="316" y="276" width="64" height="64" rx="8" fill="#e3f2fd" stroke="#2e7d32" stroke-width="12" />
+  
+  <!-- Door -->
+  <rect x="220" y="310" width="72" height="120" rx="4" fill="#8d6e63" stroke="#2e7d32" stroke-width="12" />
+  <circle cx="276" cy="370" r="6" fill="#ffc107" />
+  
+  <!-- Welcome Sign Board -->
+  <rect x="176" y="90" width="160" height="50" rx="10" fill="#ffc107" stroke="#2e7d32" stroke-width="12" />
+  <!-- Text representation inside SVG -->
+  <text x="256" y="122" font-family="'Inter', sans-serif" font-weight="900" font-size="22" fill="#2e7d32" text-anchor="middle">JANA</text>
+</svg>
