@@ -1,5 +1,5 @@
 // Login Page - Email/password login with AuthContext integration
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import API from '../services/api';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -15,6 +15,67 @@ function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const handleGoogleCredentialResponse = async (response) => {
+    setError('');
+    setLoading(true);
+    try {
+      const res = await API.post('/auth/google-login', {
+        token: response.credential
+      });
+
+      // Save to AuthContext + localStorage
+      login(res.data.user, res.data.token);
+
+      // Redirect based on role
+      if (res.data.user.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/products');
+      }
+    } catch (err) {
+      setError(
+        err.response?.data?.message || 'Google login failed. Please try again.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const initializeGoogle = () => {
+      if (window.google) {
+        window.google.accounts.id.initialize({
+          client_id: process.env.REACT_APP_GOOGLE_CLIENT_ID || 'your-google-client-id-here.apps.googleusercontent.com',
+          callback: handleGoogleCredentialResponse
+        });
+
+        const container = document.getElementById('googleSignInButton');
+        if (container) {
+          container.innerHTML = ''; // Prevent duplicates in React Dev Mode
+          window.google.accounts.id.renderButton(container, {
+            theme: 'outline',
+            size: 'large',
+            text: 'continue_with',
+            shape: 'rectangular',
+            width: 320
+          });
+        }
+      }
+    };
+
+    // If script is already loaded
+    if (window.google) {
+      initializeGoogle();
+    } else {
+      // Wait for it to load
+      const script = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
+      if (script) {
+        script.addEventListener('load', initializeGoogle);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -132,6 +193,18 @@ function Login() {
                 </button>
 
               </form>
+
+              {/* Divider */}
+              <div className='d-flex align-items-center my-3'>
+                <hr className='flex-grow-1 text-muted' style={{ opacity: 0.2 }} />
+                <span className='mx-2 text-muted small fw-semibold'>OR</span>
+                <hr className='flex-grow-1 text-muted' style={{ opacity: 0.2 }} />
+              </div>
+
+              {/* Google Sign-In Button */}
+              <div className='d-flex justify-content-center mb-2'>
+                <div id="googleSignInButton"></div>
+              </div>
 
               {/* Register Link */}
               <p className='text-center mt-3 mb-0 small'>
