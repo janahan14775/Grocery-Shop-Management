@@ -3,6 +3,7 @@ const express = require('express');
 const {
   register,
   login,
+  googleLogin,
   sendOtp,
   verifyOtp,
   getProfile
@@ -14,6 +15,7 @@ const router = express.Router();
 // Public routes
 router.post('/register', register);        // POST /api/auth/register
 router.post('/login', login);              // POST /api/auth/login
+router.post('/google-login', googleLogin);  // POST /api/auth/google-login
 router.post('/send-otp', sendOtp);         // POST /api/auth/send-otp
 router.post('/verify-otp', verifyOtp);     // POST /api/auth/verify-otp
 

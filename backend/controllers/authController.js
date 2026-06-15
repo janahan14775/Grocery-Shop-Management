@@ -5,6 +5,9 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const { OAuth2Client } = require('google-auth-library');
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Configure Nodemailer transporter for Gmail SMTP
 const transporter = nodemailer.createTransport({
@@ -247,6 +250,80 @@ exports.getProfile = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       message: 'Failed to get profile'
+    });
+  }
+};
+
+// ============================
+// GOOGLE LOGIN - Authenticate with Google ID token
+// POST /api/auth/google-login
+// ============================
+exports.googleLogin = async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({
+        message: 'Google token is required'
+      });
+    }
+
+    // Verify token using googleClient
+    const ticket = await googleClient.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID
+    });
+
+    const payload = ticket.getPayload();
+    const { email, name, email_verified } = payload;
+
+    if (!email_verified) {
+      return res.status(400).json({
+        message: 'Google email is not verified'
+      });
+    }
+
+    // Find user in DB
+    let user = await User.findOne({ email: email.toLowerCase() });
+
+    if (!user) {
+      // Create new user if they don't exist
+      // Since password is required, generate a secure random one
+      const randomPassword = crypto.randomBytes(16).toString('hex');
+      const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+      user = new User({
+        name: name || email.split('@')[0],
+        email: email.toLowerCase(),
+        password: hashedPassword,
+        isVerified: true
+      });
+
+      await user.save();
+    }
+
+    // Generate JWT
+    const jwtToken = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      token: jwtToken,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isVerified: user.isVerified
+      }
+    });
+
+  } catch (error) {
+    console.error('Google Login Error:', error);
+    res.status(500).json({
+      message: 'Google login failed. Please try again.'
     });
   }
 };
