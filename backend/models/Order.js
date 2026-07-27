@@ -46,6 +46,19 @@ const shippingAddressSchema = new mongoose.Schema(
 
 const orderSchema = new mongoose.Schema(
   {
+    // Custom human-readable Order ID (e.g. ORD-20260727-1054)
+    orderId: {
+      type: String,
+      unique: true,
+      sparse: true
+    },
+
+    // Unique Pickup Token (e.g. GK-583921)
+    pickupToken: {
+      type: String,
+      index: true
+    },
+
     // Reference to the customer who placed the order
     userId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -53,10 +66,25 @@ const orderSchema = new mongoose.Schema(
       required: true
     },
 
+    // Customer details captured at checkout
+    customerInfo: {
+      name: { type: String },
+      phone: { type: String },
+      email: { type: String }
+    },
+
+    // Store pickup details
+    pickupDate: { type: String },
+    pickupTime: { type: String },
+    storeLocation: { type: String, default: 'Main Supermarket Store - 123 Fresh Way' },
+
+    // Staff member assigned for packing
+    assignedStaff: { type: String, default: 'Unassigned' },
+
     // Array of ordered items with snapshots of product data
     items: [orderItemSchema],
 
-    // Shipping address for delivery
+    // Shipping or Contact address
     shippingAddress: shippingAddressSchema,
 
     // Subtotal before tax
@@ -84,10 +112,20 @@ const orderSchema = new mongoose.Schema(
       required: true
     },
 
-    // Order status tracking
+    // Order status tracking (supports original & new pickup workflow)
     status: {
       type: String,
-      enum: ['Pending', 'Confirmed', 'Shipped', 'Delivered'],
+      enum: [
+        'Pending',
+        'Payment Successful',
+        'Confirmed',
+        'Order Accepted',
+        'Packing',
+        'Ready for Pickup',
+        'Completed',
+        'Shipped',
+        'Delivered'
+      ],
       default: 'Pending'
     },
 

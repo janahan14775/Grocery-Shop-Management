@@ -1,6 +1,20 @@
-// Order Controller - Create orders, manage status, view history
 const Order = require('../models/Order');
 const Product = require('../models/Product');
+const { sendReadyForPickupEmail } = require('../utils/emailService');
+
+// Helper to generate unique order ID (ORD-YYYYMMDD-XXXX)
+const generateOrderId = () => {
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+  const randomDigits = Math.floor(1000 + Math.random() * 9000);
+  return `ORD-${dateStr}-${randomDigits}`;
+};
+
+// Helper to generate unique pickup token (GK-XXXXXX)
+const generatePickupToken = () => {
+  const randomNum = Math.floor(100000 + Math.random() * 900000);
+  return `GK-${randomNum}`;
+};
 
 // ============================
 // CREATE ORDER - Customer places an order
@@ -8,7 +22,7 @@ const Product = require('../models/Product');
 // ============================
 exports.createOrder = async (req, res) => {
   try {
-    const { items, shippingAddress } = req.body;
+    const { items, shippingAddress, pickupDate, pickupTime, storeLocation, customerInfo } = req.body;
 
     if (!items || items.length === 0) {
       return res.status(400).json({
@@ -57,9 +71,23 @@ exports.createOrder = async (req, res) => {
     const shippingAmount = itemsAmount >= 500 ? 0 : 40; // Free shipping above ₹500
     const totalAmount = itemsAmount + taxAmount + shippingAmount;
 
+    // Generate unique Order ID & Pickup Token
+    const orderId = generateOrderId();
+    const pickupToken = generatePickupToken();
+
     // Create order
     const order = new Order({
+      orderId,
+      pickupToken,
       userId: req.user._id,
+      customerInfo: {
+        name: customerInfo?.name || shippingAddress.name || req.user.name,
+        phone: customerInfo?.phone || shippingAddress.phone || req.user.phone || '',
+        email: req.user.email
+      },
+      pickupDate: pickupDate || new Date().toISOString().slice(0, 10),
+      pickupTime: pickupTime || '10:00 AM - 12:00 PM',
+      storeLocation: storeLocation || 'Main Supermarket Branch, Downtown',
       items: orderItems,
       shippingAddress,
       itemsAmount,
@@ -115,7 +143,7 @@ exports.getMyOrders = async (req, res) => {
 exports.getAllOrders = async (req, res) => {
   try {
     const orders = await Order.find()
-      .populate('userId', 'name email')
+      .populate('userId', 'name email phone')
       .sort({ createdAt: -1 });
 
     res.json(orders);
@@ -134,7 +162,7 @@ exports.getAllOrders = async (req, res) => {
 exports.getOrderById = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
-      .populate('userId', 'name email');
+      .populate('userId', 'name email phone');
 
     if (!order) {
       return res.status(404).json({
@@ -160,13 +188,97 @@ exports.getOrderById = async (req, res) => {
 };
 
 // ============================
+// VERIFY PICKUP TOKEN - Admin/Staff verifies token at store counter
+// POST /api/orders/verify-token
+// ============================
+exports.verifyPickupToken = async (req, res) => {
+  try {
+    const { pickupToken } = req.body;
+
+    if (!pickupToken) {
+      return res.status(400).json({ message: 'Pickup token or Order ID is required' });
+    }
+
+    const trimmedToken = pickupToken.trim().toUpperCase();
+
+    // Search by pickupToken or orderId
+    const order = await Order.findOne({
+      $or: [
+        { pickupToken: trimmedToken },
+        { orderId: trimmedToken }
+      ]
+    }).populate('userId', 'name email phone');
+
+    if (!order) {
+      return res.status(404).json({
+        valid: false,
+        message: 'No matching order found for this token/ID'
+      });
+    }
+
+    res.json({
+      valid: true,
+      order
+    });
+
+  } catch (error) {
+    console.error('Verify Token Error:', error);
+    res.status(500).json({ message: 'Failed to verify pickup token' });
+  }
+};
+
+// ============================
+// ASSIGN STAFF & UPDATE STATUS - Admin assigns staff & changes status
+// PUT /api/orders/:id/staff-status
+// ============================
+exports.assignStaffAndStatus = async (req, res) => {
+  try {
+    const { assignedStaff, status } = req.body;
+
+    const updateFields = {};
+    if (assignedStaff !== undefined) updateFields.assignedStaff = assignedStaff;
+    if (status !== undefined) updateFields.status = status;
+
+    const order = await Order.findByIdAndUpdate(
+      req.params.id,
+      { $set: updateFields },
+      { new: true }
+    ).populate('userId', 'name email phone');
+
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    // Trigger Ready for Pickup email if status changed to 'Ready for Pickup'
+    if (status === 'Ready for Pickup') {
+      sendReadyForPickupEmail(order, order.userId);
+    }
+
+    res.json(order);
+  } catch (error) {
+    console.error('Assign Staff Error:', error);
+    res.status(500).json({ message: 'Failed to update staff/status' });
+  }
+};
+
+// ============================
 // UPDATE ORDER STATUS - Admin changes status
 // PUT /api/orders/:id/status
 // ============================
 exports.updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
-    const validStatuses = ['Pending', 'Confirmed', 'Shipped', 'Delivered'];
+    const validStatuses = [
+      'Pending',
+      'Payment Successful',
+      'Confirmed',
+      'Order Accepted',
+      'Packing',
+      'Ready for Pickup',
+      'Completed',
+      'Shipped',
+      'Delivered'
+    ];
 
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
@@ -178,12 +290,17 @@ exports.updateOrderStatus = async (req, res) => {
       req.params.id,
       { status },
       { new: true }
-    ).populate('userId', 'name email');
+    ).populate('userId', 'name email phone');
 
     if (!order) {
       return res.status(404).json({
         message: 'Order not found'
       });
+    }
+
+    // Trigger email notification if status updated to Ready for Pickup
+    if (status === 'Ready for Pickup') {
+      sendReadyForPickupEmail(order, order.userId);
     }
 
     res.json(order);

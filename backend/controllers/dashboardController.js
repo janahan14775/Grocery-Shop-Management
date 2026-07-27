@@ -13,6 +13,12 @@ exports.getStats = async (req, res) => {
     const totalOrders = await Order.countDocuments();
     const totalUsers = await User.countDocuments({ role: 'customer' });
 
+    // Status breakdowns
+    const pendingOrders = await Order.countDocuments({ status: { $in: ['Pending', 'Payment Successful', 'Confirmed', 'Order Accepted'] } });
+    const packingOrders = await Order.countDocuments({ status: 'Packing' });
+    const readyForPickupOrders = await Order.countDocuments({ status: 'Ready for Pickup' });
+    const completedOrders = await Order.countDocuments({ status: { $in: ['Completed', 'Delivered'] } });
+
     // Calculate total sales from paid orders
     const orders = await Order.find({ isPaid: true });
     const totalSales = orders.reduce(
@@ -24,7 +30,11 @@ exports.getStats = async (req, res) => {
       totalProducts,
       totalOrders,
       totalSales: Math.round(totalSales * 100) / 100,
-      totalUsers
+      totalUsers,
+      pendingOrders,
+      packingOrders,
+      readyForPickupOrders,
+      completedOrders
     });
 
   } catch (error) {

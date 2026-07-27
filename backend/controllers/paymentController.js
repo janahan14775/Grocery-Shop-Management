@@ -3,6 +3,8 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const Order = require('../models/Order');
 const Payment = require('../models/Payment');
+const User = require('../models/User');
+const { sendPaymentSuccessEmail, sendAdminNewOrderEmail } = require('../utils/emailService');
 
 // Initialize Razorpay instance with credentials
 const razorpay = new Razorpay({
@@ -99,7 +101,7 @@ exports.verifyPayment = async (req, res) => {
     }
 
     // Update order with payment details
-    const order = await Order.findById(orderId);
+    const order = await Order.findById(orderId).populate('userId', 'name email phone');
 
     if (!order) {
       return res.status(404).json({
@@ -108,7 +110,7 @@ exports.verifyPayment = async (req, res) => {
     }
 
     order.isPaid = true;
-    order.status = 'Confirmed';
+    order.status = 'Payment Successful';
     order.paymentInfo = {
       razorpayOrderId,
       razorpayPaymentId,
@@ -128,6 +130,12 @@ exports.verifyPayment = async (req, res) => {
         paidAt: new Date()
       }
     );
+
+    // Trigger Email 1: Customer Payment Success Email
+    sendPaymentSuccessEmail(order, order.userId);
+
+    // Trigger Email 2: Admin New Order Alert Email
+    sendAdminNewOrderEmail(order, order.userId);
 
     res.json({
       message: 'Payment verified successfully',

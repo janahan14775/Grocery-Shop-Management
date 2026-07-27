@@ -1,4 +1,3 @@
-// Order Routes - Create, view, manage orders
 const express = require('express');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
@@ -7,7 +6,9 @@ const {
   getMyOrders,
   getAllOrders,
   getOrderById,
-  updateOrderStatus
+  updateOrderStatus,
+  verifyPickupToken,
+  assignStaffAndStatus
 } = require('../controllers/orderController');
 
 const router = express.Router();
@@ -18,6 +19,8 @@ router.get('/my-orders', authMiddleware, getMyOrders);      // GET /api/orders/m
 
 // Admin routes (auth + admin)
 router.get('/all', authMiddleware, adminMiddleware, getAllOrders);                      // GET /api/orders/all
+router.post('/verify-token', authMiddleware, adminMiddleware, verifyPickupToken);       // POST /api/orders/verify-token
+router.put('/:id/staff-status', authMiddleware, adminMiddleware, assignStaffAndStatus); // PUT /api/orders/:id/staff-status
 router.put('/:id/status', authMiddleware, adminMiddleware, updateOrderStatus);          // PUT /api/orders/:id/status
 
 // Shared route (auth - controller checks ownership)
